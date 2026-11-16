@@ -60,7 +60,8 @@ export function Settings({ list, setList, onStats }: Props) {
       <div className="cols">
         <section className="panel">
           <h3>Appearance</h3>
-          {sel('theme', 'Theme', [['dark', 'Dark'], ['light', 'Light']])}
+          {sel('theme', 'Theme', [['midnight', 'Midnight'], ['charcoal', 'Charcoal'], ['aurora', 'Aurora (animated)'], ['light', 'Light']])}
+          {sel('accent', 'Accent colour', [['indigo', 'Indigo'], ['cyan', 'Cyan'], ['green', 'Green'], ['amber', 'Amber'], ['rose', 'Rose']])}
           {sel('board', 'Board theme', [['green', 'Green'], ['brown', 'Brown'], ['blue', 'Blue']])}
           {sel('pieces', 'Piece style', [['classic', 'Classic'], ['glyph', 'Outlined glyphs']])}
           {check('coords', 'Board coordinates')}

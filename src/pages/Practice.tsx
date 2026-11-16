@@ -66,7 +66,8 @@ export function Practice({ o, onExit, drill }: { o: Opening; onExit: () => void;
   }, [path, done, side, due]);
 
   const drop = (from: string, to: string) => {
-    if (done || turn !== side) return false;
+    if (done) return false;
+    if (turn !== side) return null; // you can pick pieces up while the opponent moves, but not place them
     const mv = { from, to, promotion: 'q' };
     let san: string;
     try { san = replay(path, o.fen).move(mv).san; } catch { setMsg('That move is not legal.'); return false; }
@@ -92,7 +93,7 @@ export function Practice({ o, onExit, drill }: { o: Opening; onExit: () => void;
   return (
     <div className="split">
       <div>
-        <Board path={path} fen={o.fen} side={side} onDrop={done || turn !== side ? undefined : drop} extra={hint ? { [hint]: { boxShadow: 'inset 0 0 0 100px rgba(129,182,76,.65)' } } : undefined} />
+        <Board path={path} fen={o.fen} side={side} onDrop={done ? undefined : drop} mine={side} extra={hint ? { [hint]: { boxShadow: 'inset 0 0 0 100px rgba(129,182,76,.65)' } } : undefined} />
         <p className={msg ? 'err' : 'muted'} role="status" style={{ marginTop: 10 }}>
           {msg || (done ? 'Line complete.' : turn === side ? 'Your move.' : 'Opponent is moving…')}
         </p>

@@ -39,7 +39,7 @@ export function Learn({ o, onExit, onPractice }: { o: Opening; onExit: () => voi
   }, [finished]);
 
   const drop = (f: string, t: string) => {
-    if (!userTurn) return false;
+    if (!userTurn) return null;
     const k = matchKid(o.tree, cur, { from: f, to: t, promotion: 'q' }, o.fen);
     if (k && k.san === L[ply]) {
       setScore(s => ({ ok: s.ok + (missed.current ? 0 : 1), n: s.n + 1 }));
@@ -59,7 +59,7 @@ export function Learn({ o, onExit, onPractice }: { o: Opening; onExit: () => voi
 
   return (
     <div className="split">
-      <Board path={cur} fen={o.fen} arrows={arrows} side={o.side} onDrop={userTurn ? drop : undefined} />
+      <Board path={cur} fen={o.fen} arrows={arrows} side={o.side} onDrop={mode === 'quiz' && !finished ? drop : undefined} mine={o.side} />
       <div className="panel">
         <h2>{o.name}</h2>
         <div className="row">

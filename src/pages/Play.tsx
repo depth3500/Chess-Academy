@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Board } from '../components/Board';
+import type { Square } from 'chess.js';
 import { ANALYSIS, Engine, LEVELS, fromUci, toUci } from '../lib/engine';
 import { getSettings } from '../lib/settings';
 import { play } from '../lib/sound';
@@ -30,6 +31,7 @@ export function Play({ list }: { list: Opening[] }) {
   const [end, setEnd] = useState('');
   const [msg, setMsg] = useState('');
   const [verdict, setVerdict] = useState('');
+  const [pre, setPre] = useState<[string, string] | null>(null); // queued premove
   const engRef = useRef<Engine | null>(null);
   const eng = () => (engRef.current ??= new Engine());
   useEffect(() => () => engRef.current?.kill(), []);
@@ -83,13 +85,27 @@ export function Play({ list }: { list: Opening[] }) {
 
   useEffect(() => { if (started && over) play('end'); }, [over]);
 
+  // Play the queued premove as soon as the bot has answered, if it is still legal.
+  useEffect(() => {
+    if (!pre || turn !== color || over) return;
+    const [f, t] = pre;
+    setPre(null);
+    const id = setTimeout(() => { try { setPath(p => [...p, replay(p, startFen).move({ from: f, to: t, promotion: 'q' }).san]); } catch { /* no longer legal */ } }, 120);
+    return () => clearTimeout(id);
+  }, [path]);
+
   const start = () => {
     if (mode === 'engine' && cfg.fen.trim() && !validFen(cfg.fen.trim())) { setMsg('That FEN is not a valid position.'); return; }
-    setPath([]); setEnd(''); setMsg(''); setVerdict(''); setFlip(false); setStarted(true); };
+    setPath([]); setEnd(''); setMsg(''); setVerdict(''); setPre(null); setFlip(false); setStarted(true); };
   const drop = (f: string, t: string) => {
+    if (turn !== color) { // the bot is moving: queue a premove with one of your pieces
+      if (f !== t && c.get(f as Square)?.color === color) setPre([f, t]);
+      return null;
+    }
+    setPre(null);
     try { setPath([...path, c.move({ from: f, to: t, promotion: 'q' }).san]); return true; } catch { return false; }
   };
-  const undo = () => { let n = path.length - 1; if (n > 0 && colorAt(n, startFen) !== color) n--; setPath(path.slice(0, Math.max(0, n))); setMsg(''); };
+  const undo = () => { setPre(null); let n = path.length - 1; if (n > 0 && colorAt(n, startFen) !== color) n--; setPath(path.slice(0, Math.max(0, n))); setMsg(''); };
   const offerDraw = async () => {
     setMsg('The bot is considering your draw offer…');
     try {
@@ -101,7 +117,9 @@ export function Play({ list }: { list: Opening[] }) {
 
   return (
     <div className="split">
-      <Board path={path} fen={startFen} side={(color === 'w') !== flip ? 'w' : 'b'} onDrop={started && !over && !thinking ? drop : undefined} />
+      <Board path={path} fen={startFen} side={(color === 'w') !== flip ? 'w' : 'b'} onDrop={started && !over ? drop : undefined} mine={color}
+        extra={pre ? { [pre[0]]: { boxShadow: 'inset 0 0 0 100px rgba(239,68,68,.45)' }, [pre[1]]: { boxShadow: 'inset 0 0 0 100px rgba(239,68,68,.45)' } } : undefined}
+        arrows={pre ? [[pre[0] as Square, pre[1] as Square]] : undefined} />
       <div className="panel">
         {!started ? (
           <>
@@ -114,10 +132,10 @@ export function Play({ list }: { list: Opening[] }) {
             </label>
             <label>Opening mode
               <select value={mode} onChange={e => pick('mode', e.target.value as Mode)}>
-                <option value="strict">Strict: bot plays the main line exactly</option>
-                <option value="flexible">Flexible: bot picks any variation of the opening</option>
-                <option value="random">Random: bot picks any opening in my repertoire</option>
-                <option value="engine">Engine only</option>
+                <option value="strict">Follow my opening exactly (main line)</option>
+                <option value="flexible">Follow my opening, any variation</option>
+                <option value="random">Pick any opening from my repertoire</option>
+                <option value="engine">Just play a normal game</option>
               </select>
             </label>
             {(mode === 'strict' || mode === 'flexible') && (
@@ -145,6 +163,7 @@ export function Play({ list }: { list: Opening[] }) {
             <div className="tree">{path.map((s, i) => (colorAt(i, startFen) === 'w' || i === 0 ? `${plyLabel(i, startFen)} ${s}` : s)).join(' ') || 'No moves yet.'}</div>
             <div className="row">
               <button onClick={undo} disabled={!path.length || over}>Undo</button>
+              {pre && <button onClick={() => setPre(null)}>Cancel premove</button>}
               <button onClick={() => setFlip(!flip)}>Flip board</button>
               <button onClick={offerDraw} disabled={over || thinking || !path.length}>Offer draw</button>
               <button onClick={() => setEnd(`You resigned. ${color === 'w' ? 'Black' : 'White'} wins.`)} disabled={over}>Resign</button>
