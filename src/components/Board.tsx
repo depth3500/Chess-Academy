@@ -22,6 +22,21 @@ const GLYPH_PIECES = Object.fromEntries(['w', 'b'].flatMap(c => Object.keys(GLYP
     color: c === 'w' ? '#fff' : '#1a1a1a', textShadow: c === 'w' ? '0 0 2px #000, 0 0 3px #000, 0 0 3px #000' : '0 0 2px #fff, 0 0 3px #fff' }}>{GLYPH[t] + '\uFE0E'}</div>
 )]))) as unknown as Pieces;
 
+const setCache = new Map<string, Pieces>();
+/** Piece sets from public/pieces/<set>/<wK>.svg; "classic" is the board library's built-in set. */
+export function piecesFor(set: string): Pieces | undefined {
+  if (set === 'glyph') return GLYPH_PIECES;
+  if (set === 'classic') return undefined;
+  let p = setCache.get(set);
+  if (!p) {
+    p = Object.fromEntries(['w', 'b'].flatMap(c => Object.keys(GLYPH).map(t => [c + t, ({ squareWidth }: { squareWidth: number }) => (
+      <img src={`${import.meta.env.BASE_URL}pieces/${set}/${c}${t}.svg`} alt="" draggable={false} style={{ width: squareWidth, height: squareWidth, display: 'block' }} />
+    )]))) as unknown as Pieces;
+    setCache.set(set, p);
+  }
+  return p;
+}
+
 type Props = {
   path: string[];
   arrows?: [Square, Square][];
@@ -42,6 +57,8 @@ export function Board({ path, fen, side, onDrop, mine, extra, arrows }: Props) {
   const last = h[h.length - 1];
   const who = mine ?? c.turn();
   const [sel, setSel] = useState<Square | null>(null);
+  const [dur, setDur] = useState(170); // piece slide time; 0 right after a drag so the piece does not slide again
+  useEffect(() => { if (dur === 0) { const id = setTimeout(() => setDur(170), 80); return () => clearTimeout(id); } }, [dur]);
 
   // When it is not the user's turn, show where their piece could go if it were (for picking up and premoves).
   const probe = (() => {
@@ -54,9 +71,10 @@ export function Board({ path, fen, side, onDrop, mine, extra, arrows }: Props) {
   if (sel) styles[sel] = { ...styles[sel], boxShadow: 'inset 0 0 0 100px rgba(255,214,10,.4)' };
   for (const m of targets) styles[m.to] = { ...styles[m.to], backgroundImage: m.captured ? RING : DOT };
 
-  const move = (f: string, t: string) => {
+  const move = (f: string, t: string, drag = false) => {
     const r = onDrop?.(f, t) ?? null;
     if (r === false && f !== t) play('illegal');
+    if (r === true && drag) setDur(0);
     return r === true;
   };
   const click = (sq: Square) => {
@@ -90,13 +108,13 @@ export function Board({ path, fen, side, onDrop, mine, extra, arrows }: Props) {
         boardOrientation={side === 'w' ? 'white' : 'black'}
         arePiecesDraggable={!!onDrop}
         isDraggablePiece={({ piece }) => piece[0] === who}
-        animationDuration={180}
-        onPieceDrop={(f, t) => move(f, t)}
+        animationDuration={dur}
+        onPieceDrop={(f, t) => move(f, t, true)}
         onSquareClick={click}
         onPromotionCheck={() => false}
         showBoardNotation={s.coords}
         customArrows={arrows?.map((a): [Square, Square, string] => [a[0], a[1], 'rgba(124,140,255,.85)'])}
-        customPieces={s.pieces === 'glyph' ? GLYPH_PIECES : undefined}
+        customPieces={piecesFor(s.pieces)}
         customSquareStyles={styles}
         customDarkSquareStyle={{ backgroundColor: dark }}
         customLightSquareStyle={{ backgroundColor: light }}
