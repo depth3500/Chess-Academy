@@ -1,8 +1,8 @@
 import { Chess } from 'chess.js';
 
 /** A repertoire is a tree of moves: each node holds one SAN move and its continuations. */
-export type N = { san: string; kids: N[]; note?: string };
-export type Opening = { id: string; name: string; eco: string; side: 'w' | 'b'; tree: N[]; fen?: string };
+export type N = { san: string; kids: N[]; note?: string; name?: string };
+export type Opening = { id: string; name: string; eco: string; side: 'w' | 'b'; tree: N[]; fen?: string; tmp?: boolean };
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 export const allLines = (t: N[], pre: string[] = []): string[][] => t.flatMap(n => (n.kids.length ? allLines(n.kids, [...pre, n.san]) : [[...pre, n.san]]));
@@ -27,13 +27,16 @@ export function isLegal(sans: string[], fen?: string) {
   try { replay(sans, fen); return true; } catch { return false; }
 }
 
-export function addLine(tree: N[], sans: string[]) {
+/** Adds a line to the tree. `name` (e.g. "Giuoco Piano: Classical Variation") is kept on the last move of the line. */
+export function addLine(tree: N[], sans: string[], name?: string) {
   let lvl = tree;
+  let n: N | undefined;
   for (const s of sans) {
-    let n = lvl.find(k => k.san === s);
+    n = lvl.find(k => k.san === s);
     if (!n) { n = { san: s, kids: [] }; lvl.push(n); }
     lvl = n.kids;
   }
+  if (name && n && !n.name) n.name = name;
 }
 
 export function kidsAt(tree: N[], path: string[]): N[] {
