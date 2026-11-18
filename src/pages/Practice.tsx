@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Board } from '../components/Board';
+import { lineName } from '../lib/lines';
 import { getSettings } from '../lib/settings';
 import { play } from '../lib/sound';
 import { Entry, applyReviews, logSession } from '../lib/store';
@@ -10,7 +11,7 @@ import { N, Opening, colorAt, kidsAt, matchKid, plyLabel, replay } from '../lib/
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const ZERO = { tries: 0, ok: 0, hints: 0, missed: [] as string[] };
 
-export function Practice({ o, onExit, drill }: { o: Opening; onExit: () => void; drill?: boolean }) {
+export function Practice({ o, onExit, drill, line }: { o: Opening; onExit: () => void; drill?: boolean; line?: string[] }) {
   const S = getSettings();
   const [side, setSide] = useState<'w' | 'b'>(S.side === 'opening' ? o.side : S.side);
   const [hintsOn, setHintsOn] = useState(S.hints);
@@ -38,6 +39,7 @@ export function Practice({ o, onExit, drill }: { o: Opening; onExit: () => void;
     return colorAt(q.length - 1, o.fen) === side && due.has(`${o.id}:${q.join(' ')}`) || n.kids.some(k => hasDue(k, q));
   };
   const choose = (ks: N[]) => {
+    if (line && path.every((s, i) => s === line[i])) { const k = ks.find(x => x.san === line[path.length]); if (k) return k; } // steer along the chosen line
     const d = drill ? ks.filter(k => hasDue(k, path)) : [];
     const pool = d.length ? d : ks;
     return pool[Math.floor(Math.random() * pool.length)];
@@ -100,6 +102,7 @@ export function Practice({ o, onExit, drill }: { o: Opening; onExit: () => void;
       </div>
       <div className="panel">
         <h2>{o.name}</h2>
+        {line && <p className="muted">Line: {lineName(o.tree, line, 0)}</p>}
         {drill && <p className="muted">Review mode: the opponent steers toward your {due.size} due {due.size === 1 ? 'move' : 'moves'}.</p>}
         <div className="row">
           <button className={side === 'w' ? 'primary' : ''} onClick={() => reset('w')}>Play as White</button>
@@ -126,7 +129,7 @@ export function Practice({ o, onExit, drill }: { o: Opening; onExit: () => void;
             <div className="row"><button className="primary" onClick={() => reset(side)}>Practice again</button></div>
           </>
         )}
-        <button onClick={onExit}>Back to openings</button>
+        <button onClick={onExit}>Back to opening</button>
       </div>
     </div>
   );

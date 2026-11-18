@@ -1,72 +1,88 @@
 import { Bars } from '../components/Bars';
-import { dueByOpening, level, streak } from '../lib/srs';
+import { MiniBoard } from '../components/MiniBoard';
+import { lineInfo, progress } from '../lib/lines';
+import { dailyPuzzle } from '../lib/puzzles';
+import { dayKey, isDue, streak } from '../lib/srs';
 import { useData } from '../lib/store';
-import { Opening, lines } from '../lib/tree';
+import type { Opening } from '../lib/tree';
 
-type Go = { learn: (id: string) => void; practice: (id: string) => void; drill: (id: string) => void; play: () => void; imp: () => void };
+type Go = { hub: (id: string) => void; learn: (id: string, line: number) => void; drill: (id: string) => void; play: () => void; puzzle: () => void; explore: () => void; imp: () => void };
 
-export function Dashboard({ list, go }: { list: Opening[]; go: Go }) {
+export function Dashboard({ list, favs, go }: { list: Opening[]; favs: string[]; go: Go }) {
   const d = useData();
   if (!d) return <p className="muted">Loading your progress…</p>;
   const now = Date.now();
-  const { sessions, lessons, cards } = d;
-  const cs = Object.values(cards);
-  const tries = sessions.reduce((a, s) => a + s.tries, 0);
-  const ok = sessions.reduce((a, s) => a + s.ok, 0);
-  const due = dueByOpening(cards, now);
-  const dueTotal = Object.values(due).reduce((a, b) => a + b, 0);
-  const byId = (id: string) => list.find(o => o.id === id);
-  const topDue = Object.entries(due).filter(([id]) => byId(id)).sort((a, b) => b[1] - a[1])[0];
-  const practiced = new Set(cs.filter(c => c.seen > 0).map(c => c.opening));
-  const fresh = list.find(o => lines(o.tree) && !practiced.has(o.id));
-  const next = topDue ? { o: byId(topDue[0])!, kind: 'drill' as const, why: `${topDue[1]} ${topDue[1] === 1 ? 'move is' : 'moves are'} due for review.` }
-    : fresh ? { o: fresh, kind: 'learn' as const, why: 'You have not studied this opening yet.' }
-    : list[0] ? { o: list[0], kind: 'practice' as const, why: 'Nothing is due. Keep your repertoire sharp.' } : null;
-  const recent = sessions.slice(-12);
-  const pct = (s: { ok: number; tries: number }) => (s.tries ? Math.round((s.ok / s.tries) * 100) : 0);
-  const stat = (k: string, v: string | number) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>;
+  const { sessions, lessons, cards, puzzles } = d;
+  const mine = list.filter(o => !o.tmp || favs.includes(o.id) || Object.keys(cards).some(k => k.startsWith(o.id + ':')));
+  const infos = mine.map(o => ({ o, l: lineInfo(o, cards, now) }));
+  const tot = infos.reduce((a, x) => { const p = progress(x.l); return { learned: a.learned + p.learned, total: a.total + p.total }; }, { learned: 0, total: 0 });
+  const due = Object.values(cards).filter(c => isDue(c, now)).length;
+  const tries = sessions.reduce((a, s) => a + s.tries, 0), ok = sessions.reduce((a, s) => a + s.ok, 0);
+  const acts = [...sessions.map(s => s.at), ...lessons.map(l => l.at), ...puzzles.map(p => p.at)];
+  const days = [...Array(7)].map((_, i) => { const t = new Date(now); t.setDate(t.getDate() - (6 - i)); return t; });
+  const counts = days.map(t => acts.filter(a => dayKey(a) === dayKey(+t)).length);
+  const peak = Math.max(1, ...counts);
+
+  const lastId = sessions[sessions.length - 1]?.opening;
+  const open = (x: (typeof infos)[number]) => x.l.some(l => l.status !== 'learned');
+  const target = infos.find(x => x.o.id === lastId && open(x)) ?? infos.find(open) ?? infos[0];
+  const nextLine = target?.l.find(l => l.status !== 'learned');
+  const hour = new Date().getHours();
+  const hello = hour < 5 ? 'Still up?' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const pz = dailyPuzzle();
+  const solved = puzzles.some(p => p.daily && p.ok && dayKey(p.at) === dayKey(now));
+  const s = streak(acts, now);
+  const stat = (k: string, v: string | number, sub?: string) => <div key={k}><dt>{k}</dt><dd>{v}</dd>{sub && <small>{sub}</small>}</div>;
 
   return (
     <>
-      <h1>Dashboard</h1>
-      {next && (
-        <section className="hero">
-          <div><h2>{next.o.name}</h2><p className="muted">{next.why}</p></div>
-          <button className="primary" onClick={() => go[next.kind](next.o.id)}>Continue learning</button>
-        </section>
-      )}
-      <dl className="stats stats3">
-        {stat('Openings', list.length)}
-        {stat('Practice sessions', sessions.length)}
-        {stat('Accuracy', tries ? `${Math.round((ok / tries) * 1000) / 10}%` : '—')}
-        {stat('Day streak', streak([...sessions.map(s => s.at), ...lessons.map(l => l.at)], now))}
-        {stat('Moves memorized', cs.filter(c => level(c) >= 4).length)}
-        {stat('Due for review', dueTotal)}
-      </dl>
+      <section className="hero2">
+        <div>
+          <p className="eyebrow">{hello}</p>
+          <h1>{s > 0 ? `${s}-day streak` : 'Ready to train?'}</h1>
+          <p className="lead" style={{ marginBottom: 0 }}>
+            {target ? <>Next up: <strong>{target.o.name}</strong>{nextLine ? ` · ${nextLine.name}` : ''}. {due > 0 ? `${due} ${due === 1 ? 'move is' : 'moves are'} due for review.` : 'Nothing is due right now.'}</> : 'Add an opening from Explore to get started.'}
+          </p>
+        </div>
+        <div className="row">
+          {target && nextLine && <button className="primary" onClick={() => go.learn(target.o.id, nextLine.i)}>Continue learning</button>}
+          {due > 0 && target && <button onClick={() => go.drill(infos.find(x => x.l.some(l => l.due))?.o.id ?? target.o.id)}>Review {due} due</button>}
+          {!target && <button className="primary" onClick={go.explore}>Explore openings</button>}
+        </div>
+      </section>
+
       <div className="cols">
-        <section className="panel">
-          <h3>Needing review</h3>
-          {topDue ? Object.entries(due).filter(([id]) => byId(id)).map(([id, n]) => (
-            <div className="row between" key={id}><span>{byId(id)!.name} <span className="muted">({n} due)</span></span><button onClick={() => go.drill(id)}>Review</button></div>
-          )) : <p className="muted">Nothing is due. Practice an opening to start building your review schedule.</p>}
+        <section className="panel pzcard">
+          <div className="row between"><h3>Daily puzzle</h3><span className={'chip ' + (solved ? 'ok' : 'plain')}>{solved ? 'Solved ✓' : '≈ ' + pz.r}</span></div>
+          <div className="preview click" onClick={go.puzzle}><MiniBoard sans={[]} fen={pz.fen} side={pz.side} /></div>
+          <p className="muted">{pz.side === 'w' ? 'White' : 'Black'} to move · {pz.t}</p>
+          <button className={solved ? '' : 'primary'} onClick={go.puzzle}>{solved ? 'Try another puzzle' : 'Solve today\'s puzzle'}</button>
         </section>
         <section className="panel">
-          <h3>Recently practiced</h3>
-          {recent.length ? [...recent].reverse().slice(0, 5).map((s, i) => (
-            <div className="row between" key={i}><span>{s.name}</span><span className="muted">{pct(s)}% · {new Date(s.at).toLocaleDateString()}</span></div>
-          )) : <p className="muted">No sessions yet.</p>}
+          <h3>Your training</h3>
+          <dl className="stats">
+            {stat('Lines learned', tot.learned, tot.total ? `of ${tot.total}` : undefined)}
+            {stat('Accuracy', tries ? `${Math.round((ok / tries) * 1000) / 10}%` : '—')}
+            {stat('Sessions', sessions.length)}
+            {stat('Due for review', due)}
+          </dl>
+          <div className="progress"><div className="bar2"><i style={{ width: `${tot.total ? (tot.learned / tot.total) * 100 : 0}%` }} /></div></div>
+          <h3 style={{ marginTop: 6 }}>Last 7 days</h3>
+          <Bars values={counts.map(c => Math.round((c / peak) * 100))} labels={days.map(t => t.toLocaleDateString(undefined, { weekday: 'short' }))} empty="" show />
         </section>
         <section className="panel">
-          <h3>Recent accuracy</h3>
-          <Bars values={recent.map(pct)} labels={recent.map(s => new Date(s.at).toLocaleDateString())} empty="Your last sessions will be charted here." />
+          <div className="row between"><h3>Your openings</h3><button className="link" onClick={go.explore}>Explore more</button></div>
+          {infos.length ? infos.slice(0, 6).map(({ o, l }) => {
+            const p = progress(l);
+            return (
+              <div className="orow" key={o.id} onClick={() => go.hub(o.id)}>
+                <div><strong>{o.name}</strong><div className="bar2 thin"><i style={{ width: `${p.total ? (p.learned / p.total) * 100 : 0}%` }} /></div></div>
+                <span className="muted">{p.learned}/{p.total}</span>
+              </div>
+            );
+          }) : <p className="muted">No openings yet.</p>}
+          <div className="row"><button onClick={go.play}>Play the bot</button><button onClick={go.imp}>Import an opening</button></div>
         </section>
-      </div>
-      <h3 style={{ margin: '24px 0 8px' }}>Quick start</h3>
-      <div className="row">
-        <button disabled={!(fresh ?? next?.o)} onClick={() => go.learn((fresh ?? next!.o).id)}>Learn an opening</button>
-        <button disabled={!next} onClick={() => go.practice(next!.o.id)}>Practice an opening</button>
-        <button onClick={go.play}>Play against the bot</button>
-        <button onClick={go.imp}>Import an opening</button>
       </div>
     </>
   );

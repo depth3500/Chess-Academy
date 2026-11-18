@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { PIECE_SETS, SOUND_PACKS } from '../data/pieceSets';
 import type { Dispatch, SetStateAction } from 'react';
 import { del, get, set } from 'idb-keyval';
+import { touch } from '../lib/store';
+import { Account } from './Account';
 import { download, validOpening } from '../lib/files';
 import { LEVELS } from '../lib/engine';
 import { Settings as S, saveSettings as up, useSettings } from '../lib/settings';
-import { play } from '../lib/sound';
+import { play, preload } from '../lib/sound';
 import { Opening, uid } from '../lib/tree';
 
 type Props = { list: Opening[]; setList: Dispatch<SetStateAction<Opening[] | null>>; onStats: () => void };
@@ -12,6 +15,7 @@ type Props = { list: Opening[]; setList: Dispatch<SetStateAction<Opening[] | nul
 export function Settings({ list, setList, onStats }: Props) {
   const s = useSettings();
   const [note, setNote] = useState('');
+  useEffect(() => { preload(); }, [s.sounds]);
   const sel = <K extends keyof S>(k: K, label: string, opts: [string, string][], num = false) => (
     <label className="set">{label}
       <select value={String(s[k])} onChange={e => up({ [k]: num ? +e.target.value : e.target.value } as Partial<S>)}>{opts.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select>
@@ -44,13 +48,16 @@ export function Settings({ list, setList, onStats }: Props) {
       if (!ops.length) throw new Error('none');
       setList(ops);
       await Promise.all([set('sessions', j.sessions ?? []), set('lessons', j.lessons ?? []), set('cards', j.cards ?? {}), j.srs ? set('srs', j.srs) : del('srs')]);
+      await Promise.all(['sessions', 'lessons', 'cards', 'srs'].map(touch));
       if (j.settings) up(j.settings);
       setNote('Backup restored.');
     } catch { setNote('That file is not a valid backup.'); }
   };
   const reset = async () => {
     if (!confirm('Reset all training progress? Your openings are kept.')) return;
-    await Promise.all([del('sessions'), del('lessons'), del('cards')]);
+    // Empty values plus a "reset" time (instead of deleting) so the reset also reaches your other devices.
+    await Promise.all([set('sessions', []), set('lessons', []), set('cards', {}), set('puzzles', []), set('reset', Date.now())]);
+    await Promise.all(['sessions', 'lessons', 'cards', 'puzzles', 'reset'].map(touch));
     setNote('Training progress reset.');
   };
 
@@ -58,18 +65,27 @@ export function Settings({ list, setList, onStats }: Props) {
     <>
       <h1>Settings</h1>
       <div className="cols">
+        <Account />
         <section className="panel">
           <h3>Appearance</h3>
           {sel('theme', 'Theme', [['midnight', 'Midnight'], ['charcoal', 'Charcoal'], ['aurora', 'Aurora (animated)'], ['light', 'Light']])}
           {sel('accent', 'Accent colour', [['indigo', 'Indigo'], ['cyan', 'Cyan'], ['green', 'Green'], ['amber', 'Amber'], ['rose', 'Rose']])}
           {sel('board', 'Board theme', [['green', 'Green'], ['brown', 'Brown'], ['blue', 'Blue']])}
-          {sel('pieces', 'Piece style', [['classic', 'Classic'], ['glyph', 'Outlined glyphs']])}
+          <div className="pieces" role="group" aria-label="Piece style">
+            {PIECE_SETS.map(([id, label]) => (
+              <button key={id} className={'pset' + (s.pieces === id ? ' on' : '')} aria-pressed={s.pieces === id} onClick={() => up({ pieces: id })}>
+                <span className="pimgs">{id === 'glyph' ? <b className="pg">♞♛♚</b> : ['wN', 'bQ', 'wK'].map(p => <img key={p} alt="" src={`${import.meta.env.BASE_URL}pieces/${id === 'classic' ? 'cburnett' : id}/${p}.svg`} />)}</span>
+                {label}
+              </button>
+            ))}
+          </div>
           {check('coords', 'Board coordinates')}
           <label className="set">Interface scale ({s.scale}%)<input type="range" min={90} max={125} step={5} value={s.scale} onChange={e => up({ scale: +e.target.value })} /></label>
         </section>
         <section className="panel">
           <h3>Sound</h3>
           {check('sound', 'Sound effects')}
+          {sel('sounds', 'Sound pack', SOUND_PACKS)}
           <label className="set">Volume<input type="range" min={0} max={1} step={0.05} value={s.volume} onChange={e => up({ volume: +e.target.value })} /></label>
           <div className="row"><button onClick={() => play('move')}>Test move</button><button onClick={() => play('capture')}>Test capture</button></div>
         </section>

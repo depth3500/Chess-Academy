@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
 import { Board } from '../components/Board';
 import { NAME, explain, idea, moveAt } from '../lib/explain';
-import { logLesson } from '../lib/store';
+import { Entry, applyReviews, logLesson } from '../lib/store';
+import { lineName } from '../lib/lines';
 import { Opening, allLines, colorAt, findNode, kidsAt, matchKid, plyLabel } from '../lib/tree';
 
 const side = (c: string) => (c === 'w' ? 'White' : 'Black');
 type Mode = 'study' | 'quiz';
 
-export function Learn({ o, onExit, onPractice }: { o: Opening; onExit: () => void; onPractice: () => void }) {
+export function Learn({ o, onExit, onPractice, startLine }: { o: Opening; onExit: () => void; onPractice: () => void; startLine?: number }) {
   const all = allLines(o.tree);
-  const [li, setLi] = useState(0);
+  const names = all.map((l, i) => lineName(o.tree, l, i));
+  const [li, setLi] = useState(Math.min(startLine ?? 0, Math.max(0, all.length - 1)));
   const [ply, setPly] = useState(0);
   const [mode, setMode] = useState<Mode>('study');
   const [skip, setSkip] = useState(false);
@@ -19,13 +21,14 @@ export function Learn({ o, onExit, onPractice }: { o: Opening; onExit: () => voi
   const [msg, setMsg] = useState('');
   const [score, setScore] = useState({ ok: 0, n: 0 });
   const missed = useRef(false);
+  const entries = useRef<Entry[]>([]); // quiz answers feed the review schedule, like practice does
 
   const L = all[li] ?? [];
   const cur = L.slice(0, ply);
   const turn = colorAt(ply, o.fen);
   const finished = ply >= L.length;
   const userTurn = mode === 'quiz' && !finished && turn === o.side;
-  const go = (l: number, m: Mode) => { setLi(l); setMode(m); setPly(0); setHint(0); setMsg(''); setScore({ ok: 0, n: 0 }); missed.current = false; };
+  const go = (l: number, m: Mode) => { setLi(l); setMode(m); setPly(0); setHint(0); setMsg(''); setScore({ ok: 0, n: 0 }); missed.current = false; entries.current = []; };
 
   // In the quiz the opponent's moves play themselves after a short pause.
   useEffect(() => {
@@ -35,13 +38,14 @@ export function Learn({ o, onExit, onPractice }: { o: Opening; onExit: () => voi
   }, [mode, ply, li]);
 
   useEffect(() => {
-    if (mode === 'quiz' && finished && score.n) logLesson({ opening: o.id, name: o.name, at: Date.now(), ok: score.ok, total: score.n });
+    if (mode === 'quiz' && finished && score.n) { logLesson({ opening: o.id, name: o.name, at: Date.now(), ok: score.ok, total: score.n }); void applyReviews(entries.current); entries.current = []; }
   }, [finished]);
 
   const drop = (f: string, t: string) => {
     if (!userTurn) return null;
     const k = matchKid(o.tree, cur, { from: f, to: t, promotion: 'q' }, o.fen);
     if (k && k.san === L[ply]) {
+      entries.current.push({ key: `${o.id}:${[...cur, L[ply]].join(' ')}`, opening: o.id, label: `${o.name}: ${plyLabel(ply, o.fen)} ${L[ply]}`, wrong: missed.current ? 1 : 0, hint: hint > 0 });
       setScore(s => ({ ok: s.ok + (missed.current ? 0 : 1), n: s.n + 1 }));
       missed.current = false; setHint(0); setMsg('Correct!'); setPly(ply + 1);
       return true;
@@ -68,7 +72,7 @@ export function Learn({ o, onExit, onPractice }: { o: Opening; onExit: () => voi
         </div>
         <label>Line
           <select value={li} onChange={e => go(+e.target.value, mode)}>
-            {all.map((l, i) => <option key={i} value={i}>{i + 1}. …{l.slice(-3).join(' ')} ({l.length} moves)</option>)}
+            {all.map((l, i) => <option key={i} value={i}>{i + 1}. {names[i]} ({l.length} moves)</option>)}
           </select>
         </label>
         <label className="check"><input type="checkbox" checked={skip} onChange={e => setSkip(e.target.checked)} /> Skip explanations, just memorize</label>
@@ -104,7 +108,7 @@ export function Learn({ o, onExit, onPractice }: { o: Opening; onExit: () => voi
           <button onClick={() => setPly(ply - 1)} disabled={mode === 'quiz' || !ply}>Back</button>
           <button onClick={() => setPly(ply + 1)} disabled={mode === 'quiz' || finished}>Next</button>
           <button className="primary" onClick={onPractice}>Practice this opening</button>
-          <button onClick={onExit}>Back to openings</button>
+          <button onClick={onExit}>Back to opening</button>
         </div>
       </div>
     </div>

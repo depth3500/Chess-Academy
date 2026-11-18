@@ -83,7 +83,10 @@ export function Play({ list }: { list: Opening[] }) {
     return () => { live = false; };
   }, [over]);
 
-  useEffect(() => { if (started && over) play('end'); }, [over]);
+  useEffect(() => {
+    if (!(started && over)) return;
+    play(c.isCheckmate() ? (turn !== color ? 'win' : 'lose') : end.startsWith('You resigned') ? 'lose' : 'draw');
+  }, [over]);
 
   // Play the queued premove as soon as the bot has answered, if it is still legal.
   useEffect(() => {
