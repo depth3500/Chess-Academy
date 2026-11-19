@@ -34,6 +34,15 @@ Without this the app works exactly as before and keeps data in the browser. With
 How sync works: openings and the review schedule use "newest edit wins"; sessions, lessons and per-move progress are merged so nothing is lost when two devices both practised;
 "Reset training progress" also resets your other devices. Signing in as a different account on the same browser clears the previous account's local data first.
 
+## Game review
+Review tab: load your recent games from **chess.com** or **Lichess** by username (their public APIs, no login), or paste/open a PGN.
+Stockfish 19 runs in your browser (a few workers in parallel) and every move gets a class: Brilliant, Great, Best, Excellent, Good, Book, Inaccuracy, Mistake, Miss or Blunder,
+plus per-player accuracy, an evaluation bar and graph, best-move arrows, the engine's line, the opening name and "jump to my mistakes". Reviews are cached on your device.
+- Accuracy uses the open lichess formulas (win chance from the evaluation, then a volatility-weighted and harmonic mean of per-move accuracy). Move classes use how much win probability a move gave away,
+  the same idea chess.com describes for its classes. Results are close to, but not identical with, chess.com's Game Review: they depend on engine depth (pick Fast, Standard or Deep) and on chess.com's private tuning.
+  If chess.com already reviewed a game, its own accuracy is shown next to ours so you can compare.
+- Not included yet: estimated game rating, clock/time-trouble analysis, retrying mistakes as puzzles.
+
 ## More puzzles
 `src/data/puzzles.json` has 310 puzzles generated with Stockfish. To add more (the daily puzzle is `day number mod puzzle count`):
 ```bash
@@ -71,6 +80,7 @@ Ratings are engine-based estimates (search depth needed, quiet moves, mate lengt
 - [x] Explore: star favorites, open any opening to try it (stars keep it in My openings), filter by side, first move, style and favorites, sort by style or size
 - [x] Daily puzzle (a new puzzle every day from a stored set of Stockfish-generated puzzles with estimated ratings), plus random puzzles by difficulty
 - [x] Piece sets (11 from lichess) and sound packs (Lichess SFX, Piano, NES, Futuristic, or synthesized wood). Licences: see CREDITS.md. The project is now AGPL-3.0.
+- [x] Game review (chess.com / Lichess / PGN import, Stockfish in the browser). See above.
 - [ ] Still open: editing the shared catalog from the website, more piece sets, animations beyond the board's built-in piece sliding, bundled per-opening commentary (import it via PGN comments for now)
 
 Notes: moves can be made by dragging or by clicking a piece and then a highlighted square (legal moves are shown). Under-promotion: type the move (e.g. `e8=N`) in the editor.

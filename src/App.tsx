@@ -11,12 +11,13 @@ import { OpeningHub } from './pages/OpeningHub';
 import { Play } from './pages/Play';
 import { Practice } from './pages/Practice';
 import { PuzzlePage } from './pages/Puzzle';
+import { ReviewPage } from './pages/Review';
 import { Settings } from './pages/Settings';
 import { Stats } from './pages/Stats';
 
-type V = 'dash' | 'explore' | 'lib' | 'hub' | 'puzzle' | 'play' | 'stats' | 'settings' | 'edit' | 'learn' | 'practice';
+type V = 'dash' | 'explore' | 'lib' | 'hub' | 'puzzle' | 'review' | 'play' | 'stats' | 'settings' | 'edit' | 'learn' | 'practice';
 type View = { v: V; id?: string; drill?: boolean; line?: number };
-const NAV: [V, string][] = [['dash', 'Dashboard'], ['explore', 'Explore'], ['lib', 'My openings'], ['puzzle', 'Puzzles'], ['play', 'Play'], ['stats', 'Statistics'], ['settings', 'Settings']];
+const NAV: [V, string][] = [['dash', 'Dashboard'], ['explore', 'Explore'], ['lib', 'My openings'], ['puzzle', 'Puzzles'], ['review', 'Review'], ['play', 'Play'], ['stats', 'Statistics'], ['settings', 'Settings']];
 const GROUP: Partial<Record<V, V>> = { edit: 'lib', practice: 'lib', learn: 'lib', hub: 'lib' };
 
 export default function App() {
@@ -42,9 +43,11 @@ export default function App() {
         {view.v === 'settings' ? (
           <Settings list={list} setList={setList} onStats={() => go('stats')} />
         ) : view.v === 'dash' ? (
-          <Dashboard list={list} favs={favs} go={{ hub, learn: (id, line) => go('learn', id, { line }), drill: id => go('practice', id, { drill: true }), play: () => go('play'), puzzle: () => go('puzzle'), explore: () => go('explore'), imp: () => go('lib', 'new') }} />
+          <Dashboard list={list} favs={favs} go={{ hub, learn: (id, line) => go('learn', id, { line }), drill: id => go('practice', id, { drill: true }), play: () => go('play'), puzzle: () => go('puzzle'), review: () => go('review'), explore: () => go('explore'), imp: () => go('lib', 'new') }} />
         ) : view.v === 'explore' ? (
           <Explore list={list} setList={setList} favs={favs} toggleFav={toggleFav} open={hub} />
+        ) : view.v === 'review' ? (
+          <ReviewPage />
         ) : view.v === 'puzzle' ? (
           <PuzzlePage />
         ) : view.v === 'stats' ? (

@@ -6,7 +6,7 @@ import { dayKey, isDue, streak } from '../lib/srs';
 import { useData } from '../lib/store';
 import type { Opening } from '../lib/tree';
 
-type Go = { hub: (id: string) => void; learn: (id: string, line: number) => void; drill: (id: string) => void; play: () => void; puzzle: () => void; explore: () => void; imp: () => void };
+type Go = { hub: (id: string) => void; learn: (id: string, line: number) => void; drill: (id: string) => void; play: () => void; puzzle: () => void; review: () => void; explore: () => void; imp: () => void };
 
 export function Dashboard({ list, favs, go }: { list: Opening[]; favs: string[]; go: Go }) {
   const d = useData();
@@ -81,7 +81,7 @@ export function Dashboard({ list, favs, go }: { list: Opening[]; favs: string[];
               </div>
             );
           }) : <p className="muted">No openings yet.</p>}
-          <div className="row"><button onClick={go.play}>Play the bot</button><button onClick={go.imp}>Import an opening</button></div>
+          <div className="row"><button onClick={go.review}>Review a game</button><button onClick={go.play}>Play the bot</button><button onClick={go.imp}>Import an opening</button></div>
         </section>
       </div>
     </>

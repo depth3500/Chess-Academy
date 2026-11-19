@@ -39,7 +39,7 @@ export function piecesFor(set: string): Pieces | undefined {
 
 type Props = {
   path: string[];
-  arrows?: [Square, Square][];
+  arrows?: ([Square, Square] | [Square, Square, string])[];
   fen?: string;
   side: 'w' | 'b';
   /** true = move made, false = illegal (plays a sound), null = ignore silently (e.g. not your turn). */
@@ -113,7 +113,7 @@ export function Board({ path, fen, side, onDrop, mine, extra, arrows }: Props) {
         onSquareClick={click}
         onPromotionCheck={() => false}
         showBoardNotation={s.coords}
-        customArrows={arrows?.map((a): [Square, Square, string] => [a[0], a[1], 'rgba(124,140,255,.85)'])}
+        customArrows={arrows?.map((a): [Square, Square, string] => [a[0], a[1], a[2] ?? 'rgba(124,140,255,.85)'])}
         customPieces={piecesFor(s.pieces)}
         customSquareStyles={styles}
         customDarkSquareStyle={{ backgroundColor: dark }}

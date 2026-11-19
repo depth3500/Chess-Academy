@@ -26,3 +26,4 @@ The lichess "standard" sound set is **not** included: lichess lists it as non-fr
 - Stockfish 19 (`public/stockfish/`): GPLv3, see `public/stockfish/COPYING.txt`.
 - Font: Plus Jakarta Sans (SIL Open Font License) via Fontsource.
 - Puzzles (`src/data/puzzles.json`) are generated with Stockfish by `scripts/gen-puzzles.mjs`; their ratings are engine-derived estimates.
+- Game review: win-chance and accuracy formulas are the open formulas published by lichess.org; the engine is Stockfish. Game data is fetched from the public chess.com and lichess.org APIs.
